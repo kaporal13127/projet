@@ -2,18 +2,34 @@
 
 namespace App\DataFixtures;
 
+use App\Entity\Comment;
+use App\Entity\Critic;
 use App\Entity\Game;
+use App\Entity\User;
 use Doctrine\Bundle\FixturesBundle\Fixture;
 use Doctrine\Common\Persistence\ObjectManager;
 use Faker\Factory;
+use Symfony\Component\Security\Core\Encoder\UserPasswordEncoderInterface;
 
 class AppFixtures extends Fixture
 {
+    private $encoder;
+
+    public function __construct(UserPasswordEncoderInterface $encoder)
+    {
+        $this->encoder = $encoder;
+    }
+
+
     public function load(ObjectManager $manager)
     {
         $faker = Factory::create("fr_FR");
+        $faker->addProvider(new \Metrakit\EddyMalou\EddyMalouProvider($faker));
+        $faker->addProvider(new \Metrakit\EddyMalou\TextProvider($faker));
 
         $gta = new Game;
+
+        $status = [Critic::STATUS_PENDING, Critic::STATUS_REJECTED, Critic::STATUS_VALIDATE];
 
         $gta
             ->setDescription("Jeu d'action-aventure en monde ouvert, Grand Theft Auto (GTA) V  vous place dans la peau de trois personnages inédits : Michael, Trevor et Franklin. Ces derniers ont élu domicile à Los Santos, ville de la région de San Andreas. Braquages et missions font partie du quotidien du joueur qui pourra également cohabiter avec 29 autres utilisateurs dans cet univers persistant.")
@@ -35,6 +51,7 @@ class AppFixtures extends Fixture
             ->setReleaseDate("2012");
         $manager->persist($wakfu);
 
+        $users = [];
         $wow = new Game;
 
         $wow
@@ -45,6 +62,60 @@ class AppFixtures extends Fixture
             ->setPublishingHouse("Blizzard Entertainment")
             ->setReleaseDate("2005");
         $manager->persist($wow);
+
+        $admin = new User;
+        $games = [$gta, $wakfu, $wow];
+
+        $admin
+            ->setEmail("admin@gmail.com")
+            ->setFullName("Perez Nicolas")
+            ->setRoles(["ROLE_ADMIN"])
+            ->setUserName("Kaporal Hunter")
+            ->setPassword($this->encoder->encodePassword($admin, "password"))
+            ->setAvatar("https://steamcdn-a.akamaihd.net/steamcommunity/public/images/avatars/6f/6f28658f811eeeedb92338ad421330a921991262_full.jpg");
+        $manager->persist($admin);
+
+        $users[] = $admin;
+
+        for ($u = 0; $u < 6; $u++) {
+            $user = new User;
+
+            $user->setAvatar($faker->imageUrl(400, 400))
+                ->setEmail("user$u@gmail.com")
+                ->setFullName($faker->name())
+                ->setPassword($this->encoder->encodePassword($user, "password"))
+                ->setUserName($faker->userName);
+
+            $manager->persist($user);
+
+            $users[] = $user;
+
+
+            for ($c = 0; $c < \mt_rand(0, 3); $c++) {
+                $critic = new Critic;
+
+                $critic->setCreatedAt($faker->dateTimeThisYear())
+                    ->setAuthor($faker->randomElement($users))
+                    ->setDescription($faker->paragraph(1))
+                    ->setGame($faker->randomElement($games))
+                    ->setScore(\mt_rand(1, 20))
+                    ->setStatus($faker->randomElement($status))
+                    ->setContent($faker->paragraph(6));
+                $manager->persist($critic);
+
+                for ($co = 0; $co < \mt_rand(0, 6); $co++) {
+                    $comment = new Comment;
+
+                    $comment->setAuthor($faker->randomElement($users))
+                        ->setContent($faker->paragraph(\mt_rand(1, 4)))
+                        ->setCreatedAt($faker->dateTimeThisMonth())
+                        ->setCritic($critic);
+
+                    $manager->persist($comment);
+                }
+            }
+        }
+
 
         $manager->flush();
     }

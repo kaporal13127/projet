@@ -11,6 +11,11 @@ use Doctrine\ORM\Mapping as ORM;
  */
 class Critic
 {
+
+    const STATUS_VALIDATE = "VALIDATE";
+    const STATUS_REJECTED = "REJECTED";
+    const STATUS_PENDING = "PENDING";
+
     /**
      * @ORM\Id()
      * @ORM\GeneratedValue()
